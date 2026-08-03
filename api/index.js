@@ -324,7 +324,7 @@ app.post('/api/TitleData', async (req, res) => {
     const dailyTOTD = generateTOTD();
 
     res.json({
-        "MOTD": "TEST",
+        "MOTD": ""<color=red>WELCOME</color> <color=green>TO</color> <color=red>L</color><color=orange>A</color><color=yellow>V</color><color=green>R</color><color=blue>A</color><color=blue>A</color><color=purple></color><color=white></color><color=purple></color>TAGGERS/RUNNERS <color=red></color>\n<color=green>discord.gg/tvRUKnBDGH</color></color>\n<color=white>THE UPDATE IS CANTSEAME</color>\n\n<color=red>CREDS BIGBOI,BARKIN</color>\n<color=white>FOUNDERS: CURT</color>\n<color=blue>MAKE A VID FOR FINGER PAINTER.</color>\n<color=red> \n</color>\n<color=orange>COOL PEOPLE. CURT, CRUMB, BENSON</color>\n<color=blue></color>",",
         "TOTD": dailyTOTD
     });
 });
