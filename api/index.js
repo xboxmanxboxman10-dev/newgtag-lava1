@@ -324,7 +324,7 @@ app.post('/api/TitleData', async (req, res) => {
     const dailyTOTD = generateTOTD();
 
     res.json({
-        "MOTD": "",
+        "MOTD": "<WELCOME TO LAVA TAG/RUNNERS      discord.gg/tvRUKnBDGH  THE UPDATE IS CANTSEAME24  FOUNDER: OWNER  CO OWNER: RUSSIA   MAKE A VID FOR FINGER PAINTER. COOL PEOPLE CURT, CRUMB, BESON   I",
         "TOTD": dailyTOTD
     });
 });
