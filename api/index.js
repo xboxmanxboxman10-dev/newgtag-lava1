@@ -324,7 +324,7 @@ app.post('/api/TitleData', async (req, res) => {
     const dailyTOTD = generateTOTD();
 
     res.json({
-        "MOTD": "WELCOME TO LAVA TAGGER/RUNNER discord.gg/tvRUKnBDGH THE UPDATE IS CANTSEAME IDK FOUNDERS: CURT MAKE A VID FOR FINGER PAINTER.COOL PEOPLE. CURT, CRUMB, BENSON"
+        "MOTD": 
         "TOTD": dailyTOTD
     });
 });
