@@ -1,389 +1,180 @@
-const express = require('express');
-const axios = require('axios');
-const cors = require('cors');
+import requests
+import json
+from flask import Flask, jsonify, request
+from typing import List, Any
 
-const app = express();
-app.use(cors({
-    origin: '*',
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-SecretKey', 'X-Authorization']
-}));
-app.use(express.json({ limit: '50mb' }));
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1443428789710356490/WvQkeyXpdPwHSyo3PSTqAPpiXqaLTZZ6XIXSklD1N4ba8iMXgwBHGjK0MWCTgsJmZ00h"
 
-const settings = {
-    TitleId: "8D608",
-    SecretKey: "N7XPOQJB8CPZB8U6Q7A1ZNGR1QQE41CAUXJGKC6Q4PIISC69EJ",
-    ApiKey: "OC|1296841200171257|afac58dab345e294f3339925c9d11277",
-    Webhook: "ugyhsadjhkgbasda"
-};
 
-const DailyTees = [ // put item ids here
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-"",
-""
-];
+def send_discord(msg):
+    try:
+        requests.post(DISCORD_WEBHOOK_URL, json={"content": msg})
+    except Exception as e:
+        print(f"Discord webhook failed: {e}")
 
-let currentDailyItems = [];
-let lastUpdateDate = null;
-let webhookSentToday = false;
 
-async function sendwebhook(title, desc, fields, color) {
-    try {
-        const embed = {
-            embeds: [{
-                title: title,
-                description: desc,
-                color: color || 65280,
-                fields: fields || [],
-            }]
-        };
-        return await axios.post(settings.Webhook, embed);
-    } catch(e) {
-        console.error("webhook error", e.response ? e.response.data : e.message);
-    }
-}
+class GameInfo:
+    def __init__(self):
+        self.titleId: str = "8D608"
+        self.secretKey: str = "N7XPOQJB8CPZB8U6Q7A1ZNGR1QQE41CAUXJGKC6Q4PIISC69EJ"
+        self.ApiKey: str = "OC|1296841200171257|afac58dab345e294f3339925c9d11277"
 
-function getDailyItems() {
-    const today = new Date().toDateString();
-
-    if (lastUpdateDate !== today || currentDailyItems.length === 0) {
-        const shuffled = [...DailyTees].sort(() => 0.5 - Math.random());
-        const selected = shuffled.slice(0, 3);
-
-        while (selected.length < 3) {
-            selected.push(DailyTees[Math.floor(Math.random() * DailyTees.length)]);
-        }
-
-        currentDailyItems = selected;
-        lastUpdateDate = today;
-        webhookSentToday = false;
-    }
-
-    return currentDailyItems;
-}
-
-async function sendDailyWebhookIfNeeded() {
-    const today = new Date().toDateString();
-    const items = getDailyItems();
-
-    if (!webhookSentToday || lastUpdateDate !== today) {
-        await sendwebhook(
-            'Daily Tee Updated 😻',
-            `New daily cosmetics have been selected!`,
-            [
-                { name: 'CosmeticStand1', value: items[0] || 'Not set', inline: true },
-                { name: 'CosmeticStand2', value: items[1] || 'Not set', inline: true },
-                { name: 'CosmeticStand3', value: items[2] || 'Not set', inline: true },
-                { name: 'Date', value: new Date().toLocaleDateString(), inline: false }
-            ],
-            65280
-        );
-        webhookSentToday = true;
-    }
-}
-
-function generateTOTD() {
-    const items = getDailyItems();
-
-    return JSON.stringify([
-        {
-            "PedestalID": "CosmeticStand1",
-            "ItemName": items[0] || DailyTees[0],
-            "StartTimeUTC": new Date().toISOString(),
-                          "EndTimeUTC": new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-            "PedestalID": "CosmeticStand2",
-            "ItemName": items[1] || DailyTees[1],
-            "StartTimeUTC": new Date().toISOString(),
-                          "EndTimeUTC": new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        },
-        {
-            "PedestalID": "CosmeticStand3",
-            "ItemName": items[2] || DailyTees[2],
-            "StartTimeUTC": new Date().toISOString(),
-                          "EndTimeUTC": new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-        }
-    ]);
-}
-
-function getAuthHeaders() {
-    return {
-        "content-type": "application/json",
-        "X-SecretKey": settings.SecretKey
-    };
-}
-
-async function returnFunctionJson(data, funcname, funcparam = {}) {
-    const userId = data.FunctionParameter?.CallerEntityProfile?.Lineage?.TitlePlayerAccountId;
-
-    try {
-        const response = await axios.post(
-            `https://${settings.TitleId}.playfabapi.com/Server/ExecuteCloudScript`,
-            {
-                PlayFabId: userId,
-                FunctionName: funcname,
-                FunctionParameter: funcparam
-            },
-            { headers: getAuthHeaders() }
-        );
-
+    def GetAuthHeaders(self) -> dict:
         return {
-            data: response.data.data.FunctionResult,
-            status: response.status
-        };
-    } catch (error) {
-        return {
-            data: {},
-            status: error.response?.status || 500
-        };
-    }
-}
-
-async function handlePlayFabFunction(req, res, funcname, funcparam = {}) {
-    const result = await returnFunctionJson(req.body, funcname, funcparam);
-    res.status(result.status).json(result.data);
-}
-
-async function validateNonce(nonce, oculusId) {
-    try {
-        const response = await axios.post(
-            `https://graph.oculus.com/user_nonce_validate?nonce=${nonce}&user_id=${oculusId}&access_token=${settings.ApiKey}`,
-            {},
-            { headers: { "content-type": "application/json" } }
-        );
-        return response.data.is_valid === true;
-    } catch (error) {
-        console.error("Nonce validation error:", error.response?.data || error.message);
-        return false;
-    }
-}
-
-app.get('/', (req, res) => {
-    res.status(404).send('Not Found');
-});
-
-app.post('/', (req, res) => {
-    res.status(404).send('Not Found');
-});
-
-app.all('/api/PlayFabAuthentication', async (req, res) => {
-    if (req.method !== 'POST') {
-        return res.status(405).json({ error: "Not Found" });
-    }
-
-    const data = req.body;
-    const { AppId, AppVersion, Nonce, OculusId } = data;
-
-    if (!Nonce || !OculusId) {
-        await sendwebhook(
-            'PlayFab Authentication Failed 😻',
-            `Missing required fields`,
-            [
-                { name: 'OculusId', value: OculusId || 'Not provided', inline: true },
-                { name: 'Nonce', value: Nonce ? 'Provided' : 'Not provided', inline: true }
-            ],
-            16711680
-        );
-        return res.status(400).json({
-            error: "Missing required fields: Nonce and OculusId are required"
-        });
-    }
-    const isValidNonce = await validateNonce(Nonce, OculusId);
-    if (!isValidNonce) {
-        await sendwebhook(
-            'PlayFab Authentication Failed - Invalid Nonce 😻',
-            `Nonce validation failed for Oculus user`,
-            [
-                { name: 'OculusId', value: OculusId, inline: true },
-            ],
-            16711680
-        );
-        return res.status(403).json({
-            error: "Invalid nonce - authentication failed",
-            message: "The provided nonce could not be validated with Oculus"
-        });
-    }
-    try {
-        const loginReq = await axios.post(
-            `https://${settings.TitleId}.playfabapi.com/Server/LoginWithServerCustomId`,
-            {
-                ServerCustomId: "OCULUS" + OculusId,
-                CreateAccount: true
-            },
-            {
-                headers: {
-                    'X-SecretKey': settings.SecretKey,
-                    'Content-Type': 'application/json'
-                }
-            }
-        );
-
-        if (loginReq.status === 200) {
-            const rjson = loginReq.data;
-            const sessionTicket = rjson.data.SessionTicket;
-            const entityToken = rjson.data.EntityToken.EntityToken;
-            const playfabId = rjson.data.PlayFabId;
-            const entityId = rjson.data.EntityToken.Entity.Id;
-            const entityType = rjson.data.EntityToken.Entity.Type;
-            const kidAccessToken = rjson.data.KidAccessToken;
-            const kidRefreshToken = rjson.data.KidRefreshToken;
-            const kidUrlBasePath = rjson.data.KidUrlBasePath;
-            const locationCode = rjson.data.LocationCode;
-
-            await axios.post(
-                `https://${settings.TitleId}.playfabapi.com/Client/LinkCustomID`,
-                {
-                    PlayFabId: playfabId,
-                    CustomId: "OCULUS" + OculusId,
-                    ForceLink: true
-                },
-                {
-                    headers: {
-                        'X-Authorization': sessionTicket,
-                        'Content-Type': 'application/json'
-                    }
-                }
-            );
-
-            await sendwebhook(
-                'PlayFab Authentication Successful 😻',
-                `User successfully authenticated`,
-                [
-                    { name: 'OculusId', value: OculusId, inline: true },
-                    { name: 'PlayFabId', value: playfabId, inline: true },
-                    { name: 'EntityId', value: entityId, inline: false }
-                ],
-                65280
-            );
-
-            res.json({
-                "SessionTicket": sessionTicket,
-                "EntityToken": entityToken,
-                "PlayFabId": playfabId,
-                "EntityId": entityId,
-                "EntityType": entityType,
-                "KidAccessToken": kidAccessToken,
-                "KidRefreshToken": kidRefreshToken,
-                "KidUrlBasePath": kidUrlBasePath,
-                "LocationCode": locationCode
-            });
+            "content-type": "application/json",
+            "X-SecretKey": self.secretKey
         }
-    } catch (error) {
-        const banInfo = error.response?.data;
-        if (banInfo?.errorCode === 1002) {
-            const banMessage = banInfo.errorMessage || "No ban message provided.";
-            const banDetails = banInfo.errorDetails || {};
-            const banExpirationKey = Object.keys(banDetails)[0] || null;
-            const banExpirationList = banDetails[banExpirationKey] || [];
-            const banExpiration = banExpirationList.length > 0 ? banExpirationList[0] : "Indefinite";
 
-            await sendwebhook(
-                ' PlayFab Authentication - User Banned 😻',
-                `User attempted to authenticate but is banned`,
-                [
-                    { name: 'OculusId', value: OculusId, inline: true },
-                    { name: 'Ban Expiration', value: banExpiration, inline: true },
-                    { name: 'Ban Message', value: banMessage, inline: false }
-                ],
-                16711680
-            );
 
-            res.status(403).json({
-                "BanMessage": banExpirationKey,
-                "BanExpirationTime": banExpiration
-            });
-        } else {
-            await sendwebhook(
-                'PlayFab Authentication Failed 😻',
-                `Authentication error occurred`,
-                [
-                    { name: 'OculusId', value: OculusId, inline: true },
-                    { name: 'Status Code', value: error.response?.status || 500, inline: true },
-                    { name: 'Error', value: error.response?.data?.errorMessage || 'Unknown error', inline: false }
-                ],
-                16711680
-            );
+settings = GameInfo()
+app: Flask = Flask(__name__)
+playfabCache: dict = {}
 
-            res.status(error.response?.status || 500).json({
-                error: "Authentication failed",
-                message: error.response?.data?.errorMessage || "Unknown error"
-            });
-        }
-    }
-});
+titleider = settings.titleId
+secretkey = settings.secretKey
+settings.ApiKey = settings.ApiKey
 
-app.post('/api/TitleData', async (req, res) => {
-    await sendDailyWebhookIfNeeded();
-    const dailyTOTD = generateTOTD();
+ApplabInfo: dict = {
+    "testing": {"Credential": settings.ApiKey},
+    "GameNameHere2": {"Credential": "yourcred"},
+}
 
-    res.json({
-        "MOTD": "",
-        "TOTD": dailyTOTD
-    });
-});
+class AppLab:
+    def __init__(self, cred):
+        self.Credential = cred
 
-app.post('/api/photon', (req, res) => {
-    const { Ticket, Nonce, AppId, Platform } = req.body;
 
-    if (AppId !== '') {
-        return res.status(403).json({ status: 'error', message: 'bad per' });
-    }
-    if (Platform !== 'Android') {
-        return res.status(403).json({ status: 'error', message: 'Cheds' });
-    }
-    if (!Nonce) {
-        return res.status(403).json({ status: 'error', message: 'nono you cant auth' });
-    }
+AllApplabs = [AppLab(v["Credential"]) for v in ApplabInfo.values()]
 
-    res.json({
-        sessionticket: Ticket,
-        npmce: Nonce,
-        tileid: AppId
-    });
-});
 
-app.post('/api/CachePlayFabId', (req, res) => {
-    const data = req.body;
+@app.route("/", methods=["GET"])
+def index():
+    return "Backend is working, made by Nate"
 
-    res.json({
-        "Message": "Yay Your Authed",
-        "PlayFabId": data.PlayFabId,
-        "KidAccessToken": data.KidAccessToken,
-        "KidRefreshToken": data.KidRefreshToken,
-        "KidUrlBasePath": data.KidUrlBasePath,
-        "LocationCode": data.LocationCode
-    });
-});
 
-app.post('/api/ReturnMyOculusHashV2', async (req, res) => {
-    await handlePlayFabFunction(req, res, "ReturnMyOculusHash");
-});
+@app.route("/api/PlayFabAuthentication", methods=["POST"])
+def playfabauthenticate():
+    rjson = request.get_json()
+    CustomId = rjson.get("CustomId")
+    Nonce = rjson.get("Nonce")
+    OculusId = rjson.get("OculusId")
+    AppId = rjson.get("AppId")
+    Platform = rjson.get("Platform")
+    MothershipToken = rjson.get("MothershipToken")
+    MothershipId = rjson.get("MothershipId")
+    MothershipEnv = rjson.get("MothershipEnv")
+    AttestationToken = rjson.get("AttestationToken")
 
-app.post('/api/ReturnCurrentVersionV2', async (req, res) => {
-    await handlePlayFabFunction(req, res, "ReturnCurrentVersion");
-});
+    send_discord(f"PlayFab Authenticate Request:\nNonce: `{Nonce}`\nCustomId: `{CustomId}`\nMothershipId: `{MothershipId}`\nOculusId: `{OculusId}`\nAppId: `{AppId}`\nMothershipEnv: `{MothershipEnv}`\nMothershipToken: `{MothershipToken}`")
 
-app.post('/api/TryDistributeCurrencyV2', async (req, res) => {
-    await handlePlayFabFunction(req, res, "TryDistributeCurrency");
-});
+    MothershipUserInfo = {"Token": "expected_token", "Id": "expected_id"}
 
-app.post('/api/BroadCastMyRoomV2', async (req, res) => {
-    await handlePlayFabFunction(req, res, "BroadCastMyRoom", req.body.FunctionParameter);
-});
+    if MothershipToken != MothershipUserInfo.get("Token", "Not found"):
+        return jsonify({"BanMessage": "INVALID MOTHERSHIP TOKEN bro no can bypass this dum dum", "BanExpirationTime": "Indefinite"}), 403
 
-app.post('/api/ShouldUserAutomutePlayer', (req, res) => {
-    res.json({});
-});
+    if MothershipId != MothershipUserInfo.get("Id", "Not found"):
+        return jsonify({"BanMessage": "INVALID MOTHERSHIPId TOKEN | DISCORD.GG/BC", "BanExpirationTime": "Indefinite"}), 403
 
-app.listen(process.env.PORT || 1416, '0.0.0.0', () => {
-    console.log(`Server running`);
-});
+    if MothershipEnv != MothershipUserInfo.get("MothershipEnv", "Not found"):
+        return jsonify({"BanMessage": "INVALID MOTHERSHIP Env |", "BanExpirationTime": "Indefinite"}), 403
 
-module.exports = app;
+    if not AttestationToken:
+        return jsonify({
+            "BanMessage": "Missing Attestation_token dum dum made by Nate the great",
+            "BanExpirationTime": "Indefinite"
+        }), 403
+
+    required = ["CustomId", "Nonce", "AppId", "Platform", "OculusId", "MothershipInfo"]
+    for param in required:
+        if rjson.get(param) is None:
+            return jsonify({"Message": f"Missing {param} parameter", "Error": f"BadRequest-No{param}"}), 400
+
+    if AppId != titleider:
+        return jsonify({"Message": "Request sent for the wrong App ID", "Error": "BadRequest-AppIdMismatch"})
+
+    if not CustomId.startswith("OC") and not CustomId.startswith("PI"):
+        return jsonify({"Message": "Bad request", "Error": "BadRequest-No OC or PI Prefix"})
+
+    IsValid = False
+    for i in AllApplabs:
+        cred = i.Credential
+        r = requests.post(
+            url=f"https://graph.oculus.com/user_nonce_validate?user_id={OculusId}&nonce={Nonce}&access_token={cred}"
+        )
+        if r.status_code == 200 and r.json().get("is_valid") is True:
+            IsValid = True
+            break
+
+    for i in AllApplabs:
+        cred = i.Credential
+        r = requests.get(
+            url=f"https://graph.oculus.com/{CustomId.split('OCULUS')[0]}?access_token={cred}"
+        )
+        if r.status_code == 200 and r.json().get("id"):
+            IsValid = True
+            break
+
+    if not IsValid:
+        return jsonify({"error": "fuh no gng, you stinky asl"}), 400
+
+    if not NonceCheck(Nonce, OculusId):
+        return jsonify({"BanMessage": "Invalid Nonce", "BanExpirationTime": "Indefinite"}), 403
+
+    OrgScope = CustomId.replace("OCULUS", "")
+    if not OrgScopeCheck(OrgScope):
+        return jsonify({"BanMessage": "Invalid CustomID", "BanExpirationTime": "Indefinite"}), 403
+
+    PlayFabRequest = requests.post(
+        f"https://{titleider}.playfabapi.com/Server/LoginWithServerCustomId",
+        json={"ServerCustomId": CustomId, "CreateAccount": True},
+        headers={"x-secretkey": secretkey, "content-type": "application/json"}
+    )
+
+    if PlayFabRequest.status_code == 200:
+        data = PlayFabRequest.json().get("data", {})
+        return jsonify({
+            "PlayFabId": data.get("PlayFabId", 'not found'),
+            "SessionTicket": data.get("SessionTicket", 'not found'),
+            "EntityId": data.get("EntityToken", {}).get("Entity", {}).get("Id"),
+            "EntityType": data.get("EntityToken", {}).get("Entity", {}).get("Type"),
+            "EntityToken": data.get("EntityToken", {}).get("EntityToken", "not found")
+        }), 200
+    elif PlayFabRequest.status_code == 403:
+        BanInfo = PlayFabRequest.json()
+        if BanInfo.get("errorCode") == 1002:
+            Details = BanInfo.get("errorDetails", {})
+            Reason = next(iter(Details))
+            Expiration = next(iter(Details[Reason]))
+            return jsonify({'BanMessage': Reason, 'BanExpirationTime': Expiration}), 403
+
+    return jsonify({"Message": "Unknown error"}), 500
+
+
+@app.route("/api/cacheplayfabid", methods=["POST", "GET"])
+def cacheplayfabid():
+    rjson = request.get_json()
+    playfabCache[rjson.get("PlayFabId")] = rjson
+    return jsonify({"Message": "Success"}), 200
+
+
+@app.route("/api/TitleData", methods=["POST", "GET"])
+def titledata():
+    req = requests.post(f"https://{settings.titleId}.playfabapi.com/Server/GetTitleData", headers=settings.GetAuthHeaders())
+    if req.status_code == 200:
+        return jsonify(req.json().get("data", {}).get("Data", {}))
+    return jsonify({})
+
+
+@app.route("/api/consumeiap", methods=["POST", "GET"])
+def consumeoculusiap():
+    rjson = request.get_json()
+    req = requests.post(
+        f"https://graph.oculus.com/consume_entitlement?nonce={rjson.get('nonce')}&user_id={rjson.get('userID')}&sku={rjson.get('sku')}&access_token={settings.ApiKey}",
+        headers={"content-type": "application/json"}
+    )
+    return jsonify({"result": True} if req.json().get("success") else {"error": True})
+
+
+@app.route("/api/GetTier", methods=["GET"])
+def GetTier():
+    r = request.get
